@@ -87,7 +87,8 @@ Share2Earn supports a variety of passive income and bandwidth-sharing platforms 
 - 💰 **Traffmonetizer**
 - ⚡ **Peer2Profit**
 - 🌟 **Ebesucher**
-- 📊 **UpToLike**
+- 📊 **Uprock**
+- 🌿 **Grass**
 - ➕ ...and more!
 
 ---
