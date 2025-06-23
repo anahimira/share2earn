@@ -3,7 +3,7 @@
 
 </p>
 
-| <img src="./images/share2earn_logo.png" width="100" alt="Share2Earn Logo" /> | **Share2Earn** - Earn passive income by sharing your spare Internet bandwidth with a user-friendly web dashboard. ⭐️ **Star** this repo if you enjoy it! |
+| <img src="./image/share2earn_logo.png" width="100" alt="Share2Earn Logo" /> | **Share2Earn** - Earn passive income by sharing your spare Internet bandwidth with a user-friendly web dashboard. ⭐️ **Star** this repo if you enjoy it! |
 | :---------------------------------------------------------------: | :------------------------------------------------------------------------------------------------------------------------------------------------------: |
 
 ## 🚀 Quick Start
