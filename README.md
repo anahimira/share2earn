@@ -6,9 +6,10 @@
 
 - [🚀 Quick Start](#-quick-start)
 - [⚙️ Configuration](#️-configuration)
+- [✨ Features](-features)
 - [🖥️ Usage](#️-usage)
 - [🧩 Supported Apps](#-supported-apps)
-  - [📘 Setup Made Simple](#-setup-made-simple)
+- [📘 Setup Made Simple](#-setup-made-simple)
 - [📸 Screenshots](#-screenshots)
 - [✅ Tested On](#-tested-on)
 - [🤝 Contributing](#-contributing)
@@ -62,6 +63,18 @@ All settings live under `data/` as JSON files:
 > 🔒 **Tip:** Update your admin username/password in `dashboard_config.json` before first use.
 
 No extra environment variables needed. Ensure the `data/` folder is writable.
+
+---
+
+## ✨ Features
+
+| Feature              | Description                                                                 |
+|----------------------|-----------------------------------------------------------------------------|
+| 🔁 **Auto-Restart**   | Containers automatically restart if they stop unexpectedly.                 |
+| 🔄 **Auto-Update**    | Built-in support to keep containers and dependencies up to date.            |
+| 🌐 **Multi-Proxy Support** | Easily bind and manage multiple proxies per container or app.              |
+| 💻 **Multi-Platform** | Runs smoothly on Windows, macOS, Linux, and even Raspberry Pi.              |
+
 
 ---
 
