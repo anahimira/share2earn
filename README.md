@@ -44,7 +44,7 @@ Get up and running in a few simple steps:
    python main.py
    ```
 
-   * Open your browser at [http://localhost:5000](http://localhost:5000).
+   * Open your browser at [http://localhost:5000](http://localhost:5000) ỏ your chosen port in `dashboard_config.json`.
    * First run auto-generates `data/` files and configurations.
 
 ---
