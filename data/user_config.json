@@ -1,0 +1,46 @@
+{
+    "depin_node": {
+        "grass": {
+            "grass_user": "user@domain.com",
+            "grass_pass": ""
+        },
+        "gradient": {
+            "gradient_email": "user@domain.com",
+            "gradient_pass": ""
+        },
+        "dawn": {
+            "dawn_email": "",
+            "dawn_pass": ""
+        }
+    },
+    "mysterium": {
+        "dashboard_port": "4449"
+    },
+    "uprock": {
+        "port": "5111",
+        "vnc_password": "sharetoearn",
+        "vnc_port": "5722"
+    },
+    "global_settings": {
+        "cpu_limit": 1.0,
+        "enable_logs": true
+    },
+    "ebesucher": {
+        "username": "vanhbaka",
+        "web_port": "5800"
+    },
+    "adnade": {
+        "username": "vanhbaka",
+        "web_port": "5802"
+    },
+    "proxies": [],
+    "proxy_check_timeout": 10,
+    "proxy_metadata": {},
+    "earnfm": {
+        "apikey": "0a924c63-be02-4c51-814f-b1dd9b39ca9e"
+    },
+    "earnapp": {
+        "uuid": "5bbd46cecbd6e29fbca56acc04bf2c78",
+        "term": "yes"
+    }
+}

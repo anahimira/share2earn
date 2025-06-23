@@ -1,0 +1,23 @@
+.btn-check-live {
+    background: linear-gradient(90deg, #007bff, #0056b3);
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    transition: background 0.3s ease;
+}
+.btn-check-live:hover {
+    background: linear-gradient(90deg, #0056b3, #003d82);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.action-buttons form {
+    margin: 0;
+    padding: 0;
+}

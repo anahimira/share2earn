@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}Install Docker{% endblock %}
+
+{% block content %}
+<style>
+    .card {
+        transition: transform 0.2s ease-in-out;
+    }
+  .card:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+</style>
+<h1 class="mb-0 text-center">Install Docker</h1>
+<p class="text-center text-muted mb-4">Set up Docker for your system</p>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div id="flash-container">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show text-center" role="alert">
+          {{ message | safe }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<div class="card mb-4">
+  <div class="card-header bg-dark text-white">🖥️ System Architecture</div>
+  <div class="card-body">
+    <p><strong>Detected CPU Architecture:</strong> {{ architecture | upper }}</p>
+    {% if is_windows %}
+      <p class="text-info">Running on Windows. Follow the instructions below to install Docker Desktop.</p>
+    {% elif architecture in ['amd64', 'arm64'] %}
+      <p>Docker will be installed using a script optimized for {{ architecture }} architecture on Ubuntu/Debian-based systems.</p>
+    {% else %}
+      <p class="text-danger">Your architecture ({{ architecture }}) is not supported for automatic Docker installation. Please install Docker manually following the <a href="https://docs.docker.com/engine/install/" target="_blank">official Docker documentation</a>.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header bg-dark text-white">📜 Docker Installation Instructions</div>
+  <div class="card-body">
+    {% if is_windows %}
+      {{ install_instructions | safe }}
+    {% else %}
+      <pre class="bg-light p-3 rounded"><code>{{ install_script }}</code></pre>
+      {% if architecture in ['amd64', 'arm64'] %}
+        <form action="{{ url_for('install_docker.execute_docker_install') }}" method="POST">
+          <input type="hidden" name="install_script" value="{{ install_script | e }}">
+          <button type="submit" class="btn btn-primary" onclick="return confirm('Are you sure you want to execute this installation script? Ensure you have sudo privileges and are on a compatible system (e.g., Ubuntu/Debian).');">Execute Installation</button>
+        </form>
+      {% else %}
+        <button class="btn btn-primary" disabled>Execute Installation (Unsupported Architecture)</button>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<div class="text-center">
+  <a href="{{ url_for('index.index') }}" class="btn btn-secondary">⬅ Back to Dashboard</a>
+</div>
+{% endblock %}

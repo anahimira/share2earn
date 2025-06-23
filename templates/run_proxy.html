@@ -1,0 +1,293 @@
+{% extends 'base.html' %}
+
+{% block title %}Run Proxy Containers{% endblock %}
+
+{% block content %}
+<style>
+    .card {
+        transition: transform 0.2s ease-in-out;
+    }
+  .card:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+</style>
+
+<h1 class="mb-0 text-center">Run Proxy Containers</h1>
+<p class="text-center text-muted mb-4">Manage your proxy-supporting Docker apps</p>
+
+{% if not proxies %}
+  <div class="alert alert-warning" role="alert">
+    No proxies found. Please <a href="{{ url_for('proxy_page') }}" class="alert-link">add proxies</a> in the proxy settings page.
+  </div>
+{% endif %}
+
+<!-- Routing Method Selection Form -->
+<div class="row mb-4">
+  <div class="col-12 text-center">
+    <form id="proxy-handler-form">
+      <label for="proxyHandlerSelect" class="form-label">Select Proxy Handler:</label>
+      <select class="form-select w-auto d-inline-block" id="proxyHandlerSelect" name="proxy_handler">
+        <option value="tun2socks">tun2socks</option>
+        <option value="tun2proxy">tun2proxy</option>
+      </select>
+    </form>
+  </div>
+</div>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div id="flash-container">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show text-center" role="alert">
+          {{ message | safe }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<div class="row mb-4">
+  <div class="col-12 text-center">
+    <button type="button" class="btn btn-primary me-2" id="runAllProxyBtn">Run all enabled proxy apps</button>
+    <a href="{{ url_for('proxy_handle.stop_all_proxy_apps') }}" class="btn btn-danger me-2">Stop All Proxy Apps</a>
+    <button class="btn btn-success me-2" onclick="runAllTunContainers()">Run All Tun Containers</button>
+    <button class="btn btn-warning me-2" onclick="stopAllTunContainers()">Stop All Tun Containers</button>
+    <a href="{{ url_for('manage.manage') }}" class="btn btn-secondary me-2">Manage Containers</a>
+    <a href="{{ url_for('settings.settings') }}" class="btn btn-primary">Settings</a>
+  </div>
+  </div>
+</div>
+
+<h2 class="mb-4">Proxy Apps</h2>
+<div class="row">
+  {% for app in apps %}
+    <div class="col-md-6 mb-4">
+      <div class="card h-100">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+          <span>{{ app.name }}</span>
+          <span>
+            {% if app.is_running %}
+              <span class="badge bg-success">Running</span>
+            {% else %}
+              <span class="badge bg-secondary">Stopped</span>
+            {% endif %}
+            {% if app.is_enabled %}
+              <span class="badge bg-primary">Enabled</span>
+            {% else %}
+              <span class="badge bg-warning">Disabled</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="card-body">
+          <p>{{ app.description }}</p>
+          <p class="card-text">
+            <i class="fas fa-server me-1"></i>
+            <strong>VPS/Datacenter/Hosting/Cloud IP or equivalent Proxy's IP Support:</strong>
+            {% if app.supports_datacenter_ip %}
+              <i class="fas fa-check text-success me-1"></i>
+            {% else %}
+              <i class="fas fa-times text-danger me-1"></i>
+            {% endif %}
+          </p>
+        </div>
+        <div class="card-footer text-center">
+          <a href="{{ url_for('proxy.proxy_app_detail', app_id=app.id) }}" class="btn btn-primary">Configure</a>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<div class="modal fade" id="runProxyModal" tabindex="-1" aria-labelledby="runProxyModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="runProxyModalLabel">Running All Proxy Apps</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <pre id="runProxyOutput" style="white-space: pre-wrap; word-wrap: break-word;"></pre>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="runAllProxyModal" tabindex="-1" aria-labelledby="runAllProxyModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="runAllProxyModalLabel">Running All Proxy Apps</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body d-flex justify-content-center align-items-center flex-column" style="min-height: 200px;">
+        <div id="runAllProxySpinner" class="sk-circle">
+          <div class="sk-circle1 sk-child"></div>
+          <div class="sk-circle2 sk-child"></div>
+          <div class="sk-circle3 sk-child"></div>
+          <div class="sk-circle4 sk-child"></div>
+          <div class="sk-circle5 sk-child"></div>
+          <div class="sk-circle6 sk-child"></div>
+          <div class="sk-circle7 sk-child"></div>
+          <div class="sk-circle8 sk-child"></div>
+          <div class="sk-circle9 sk-child"></div>
+          <div class="sk-circle10 sk-child"></div>
+          <div class="sk-circle11 sk-child"></div>
+          <div class="sk-circle12 sk-child"></div>
+        </div>
+        <i id="runAllProxyTick" class="bi bi-check-circle-fill" style="display: none; color: #28a745; font-size: 2.5rem;"></i>
+        <p id="runAllProxyProcessingText" class="mt-3 text-center">Preparing proxy apps…</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="runAllTunModal" tabindex="-1" aria-labelledby="runAllTunModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="runAllTunModalLabel">Running All Tun Containers</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="runAllTunProgress"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="stopAllTunModal" tabindex="-1" aria-labelledby="stopAllTunModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="stopAllTunModalLabel">Stopping All Tun Containers</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="stopAllTunProgress"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+
+document.getElementById('runAllProxyBtn').addEventListener('click', function(e) {
+  e.preventDefault();
+  let done = false;
+  const modalEl = document.getElementById('runAllProxyModal');
+  const modal = new bootstrap.Modal(modalEl);
+  modal.show();
+
+  const spinner = document.getElementById('runAllProxySpinner');
+  const tick    = document.getElementById('runAllProxyTick');
+  const text    = document.getElementById('runAllProxyProcessingText');
+
+  spinner.style.display = 'block';
+  tick.style.display    = 'none';
+  text.textContent      = 'Preparing proxy apps…';
+
+  fetch('/run_all_proxies_container', { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body: `proxy_handler=${encodeURIComponent(document.getElementById('proxyHandlerSelect').value)}` })
+    .then(resp => {
+      const reader = resp.body.getReader();
+      const dec    = new TextDecoder();
+      let buf = '';
+      let lastUpdateTime = 0;
+
+      function read() {
+        reader.read().then(({ done: d, value }) => {
+          if (d) {
+            spinner.style.display = 'none';
+            tick.style.display = 'block';
+            text.textContent = 'All proxy apps processed.';
+            operationComplete = true;
+            return;
+          }
+
+          buf += dec.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop() || '';
+          const lastLine = lines.filter(l => l.trim()).pop();
+
+          const now = Date.now();
+          const delay = 1500; // 1.5 seconds minimum display time
+
+          if (lastLine) {
+            const timeSinceLastUpdate = now - lastUpdateTime;
+            const update = () => {
+              text.textContent = lastLine.trim();
+              lastUpdateTime = Date.now();
+              read(); // continue after updating
+            };
+
+            if (timeSinceLastUpdate >= delay) {
+              update(); // update immediately
+            } else {
+              setTimeout(update, delay - timeSinceLastUpdate); // wait remaining time
+            }
+          } else {
+            read(); // keep reading if no new line
+          }
+        });
+      }
+
+      read();
+    })
+    .catch(err => {
+      console.error(err);
+      spinner.style.display = 'none';
+      text.textContent      = 'Error running proxy apps.';
+    });
+
+  modalEl.addEventListener('hidden.bs.modal', () => {
+    if (done) location.reload();
+  }, { once: true });
+});
+
+  document.getElementById('runAllProxyModal').addEventListener('hidden.bs.modal', function () {
+  if (operationComplete) {
+    location.reload();
+  }
+}, { once: true });
+
+
+  function runAllTunContainers() {
+    var proxyHandler = document.getElementById('proxyHandlerSelect').value;
+    $('#runAllTunModal').modal('show');
+    document.getElementById('runAllTunProgress').innerHTML = '';
+    var eventSource = new EventSource('/run_all_tun_containers?proxy_handler=' + proxyHandler);
+    eventSource.onmessage = function(event) {
+        document.getElementById('runAllTunProgress').innerHTML += event.data + '<br>';
+    };
+    eventSource.onerror = function() {
+        eventSource.close();
+        document.getElementById('runAllTunProgress').innerHTML += 'Process completed.<br>';
+    };
+}
+
+function stopAllTunContainers() {
+    $('#stopAllTunModal').modal('show');
+    document.getElementById('stopAllTunProgress').innerHTML = '';
+    var eventSource = new EventSource('/stop_all_tun_containers');
+    eventSource.onmessage = function(event) {
+        document.getElementById('stopAllTunProgress').innerHTML += event.data + '<br>';
+    };
+    eventSource.onerror = function() {
+        eventSource.close();
+        document.getElementById('stopAllTunProgress').innerHTML += 'Process completed.<br>';
+    };
+}
+</script>
+{% endblock %}

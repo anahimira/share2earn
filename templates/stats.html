@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+
+{% block title %}System Stats - Docker Launcher{% endblock %}
+
+{% block content %}
+<h1 class="mb-4 text-center">📊 System Stats</h1>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div id="flash-container">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show text-center" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<!-- Stats Cards -->
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header bg-dark text-white">💻 CPU Usage</div>
+            <div class="card-body text-center">
+                <h3 id="cpu-usage">0%</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header bg-dark text-white">🧠 Memory Usage</div>
+            <div class="card-body text-center">
+                <h3 id="memory-usage">0 GB / 0 GB (0%)</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header bg-dark text-white">🌐 Network Usage</div>
+            <div class="card-body text-center">
+                <p><span class="badge bg-success">Sent</span> <span id="network-sent">0 MB</span></p>
+                <p><span class="badge bg-primary">Received</span> <span id="network-received">0</span></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Network Usage Chart -->
+<div class="card mb-4">
+    <div class="card-header bg-dark text-white">📈 Network Usage Over Time (KB/s)</div>
+    <div class="card-body">
+        <canvas id="networkChart"></canvas>
+    </div>
+</div>
+
+<div class="text-center mt-4">
+    <a href="{{ url_for('index.index') }}" class="btn btn-secondary">⬅ Back to Home</a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Update stats dynamically -->
+<script>
+  let networkChart;
+
+  function formatBytes(bytes) {
+    if (bytes >= 1024 * 1024 * 1024) {
+      return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    }
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  }
+
+  function updateStats() {
+    fetch('/api/stats')
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('cpu-usage').textContent = data.cpu_percent.toFixed(1) + '%';
+        document.getElementById('memory-usage').textContent = 
+          `${data.memory_used} GB / ${data.memory_total} GB (${data.memory_percent.toFixed(1)}%)`;
+        document.getElementById('network-sent').textContent = formatBytes(data.network_sent);
+        document.getElementById('network-received').textContent = formatBytes(data.network_received);
+
+        // Update network chart
+        const labels = data.network_rates.map(rate => 
+          new Date(rate.timestamp * 1000).toLocaleTimeString());
+        const uploadData = data.network_rates.map(rate => rate.upload_rate);
+        const downloadData = data.network_rates.map(rate => rate.download_rate);
+
+        if (!networkChart) {
+          networkChart = new Chart(document.getElementById('networkChart').getContext('2d'), {
+            type: 'line',
+            data: {
+              labels: labels,
+              datasets: [
+                {
+                  label: 'Upload (KB/s)',
+                  data: uploadData,
+                  borderColor: '#28a745',
+                  backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                  fill: true
+                },
+                {
+                  label: 'Download (KB/s)',
+                  data: downloadData,
+                  borderColor: '#007bff',
+                  runsColor: 'rgba(0, 123, 255, 0.2)',
+                  fill: true
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              scales: {
+                x: {
+                  title: { display: true, text: 'Time' }
+                },
+                y: {
+                  title: { display: true, text: 'Rate (KB/s)' },
+                  beginAtZero: true
+                }
+              }
+            }
+          });
+        } else {
+          networkChart.data.labels = labels;
+          networkChart.data.datasets[0].data = uploadData;
+          networkChart.data.datasets[1].data = downloadData;
+          networkChart.update();
+        }
+      })
+      .catch(error => console.error('Error fetching stats:', error));
+  }
+
+  // Update stats every 5 seconds
+  setInterval(updateStats, 5000);
+  updateStats(); // Initial call
+</script>
+{% endblock %}

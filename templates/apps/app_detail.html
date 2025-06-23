@@ -1,0 +1,522 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ app.name }}{% endblock %}
+
+{% block content %}
+<style>
+    .position-relative .form-control[type="password"] {
+    padding-right: 2.5rem;
+  }
+  .card {
+        transition: transform 0.2s ease-in-out;
+    }
+  .card:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+</style>
+
+<h1 class="mb-0 text-center">{{ app.name }}</h1>
+<p class="text-center text-muted mb-4">Configure and manage your app</p>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div id="flash-container">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show text-center" role="alert">
+          {{ message | safe }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+{% if app.is_running and app.claim_info %}
+<div class="alert alert-info mt-4 persistent-alert d-flex align-items-center">
+    <i class="bi bi-info-circle me-2" style="font-size: 1.5rem;"></i>
+    <p class="mb-0" style="font-weight: bold; font-size: 1.1rem;">
+        Your app is running!
+        {% if app.id == 'earnapp' %}
+            {% set uuid = app.config.get('uuid', '') %}
+            {{ app.claim_info | replace('{uuid}', uuid) | safe }}
+        {% elif app.id == 'mysterium' %}
+            {% set dashboard_port = app.config.get('dashboard_port', '4449') %}
+            {% set host = request.host.split(':')[0] %}
+            {% set is_local = host in ['localhost', '127.0.0.1'] %}
+            {% set claim_url = 'http://127.0.0.1:' + dashboard_port if is_local else 'http://' + host + ':' + dashboard_port %}
+            {{ app.claim_info | replace('http://localhost:{dashboard_port}', claim_url) | safe }}
+        {% elif app.id == 'ebesucher' or app.id == 'adnade' %}
+         {% set web_port = app.config.get('web_port', '5800') %}
+         {{ app.claim_info | replace('{web_port}', web_port) | safe }}
+        {% elif app.id == 'uprock' %}
+            {% set web_port = app.config.get('port', '5111') %}
+            {{ app.claim_info | replace('{port}', web_port) | safe }}
+        {% else %}
+            {{ app.claim_info | safe }}
+        {% endif %}
+    </p>
+</div>
+{% endif %}
+
+<div class="row">
+  <div class="col-md-6">
+    <div class="card mb-4">
+      <div class="card-header bg-dark text-white">📋 Instructions</div>
+      <div class="card-body bg-light">
+        {% if app.sub_apps %}
+          <div class="mb-3">
+            <label for="sub_app_select" class="form-label">Select Sub-App</label>
+            <select class="form-control" id="sub_app_select" onchange="updateInstructionsAndConfig()">
+              {% for sub_app in app.sub_apps %}
+                <option value="{{ sub_app.id }}">{{ sub_app.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div id="sub_app_instructions">
+            {{ app.sub_apps[0].instructions | safe }}
+          </div>
+        {% else %}
+          {{ app.instructions | safe }}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card mb-4">
+      <div class="card-header bg-dark text-white">⚙️ Configuration</div>
+      <div class="card-body">
+        <form action="{{ url_for('misc.save_app_config', app_id=app.id) }}" method="POST">
+          <input type="hidden" name="app_id" value="{{ app.id }}">
+          {% if app.sub_apps %}
+            <input type="hidden" name="sub_app_id" id="sub_app_id" value="{{ app.sub_apps[0].id }}">
+            <div id="sub_app_config_fields">
+              {% for field in app.sub_apps[0].config_fields %}
+                <div class="mb-3">
+                  <label for="{{ field }}" class="form-label">{{ field | replace('_', ' ') | capitalize }}</label>
+                  <input type="{% if 'pass' in field or 'password' in field %}password{% else %}text{% endif %}"
+                         class="form-control"
+                         id="{{ field }}"
+                         name="{{ field }}"
+                         value="{{ app.config.get(app.sub_apps[0].id, {}).get(field, '') }}"
+                         {% if 'pass' not in field and 'password' not in field %}placeholder="Enter your {{ field | replace('_', ' ') | capitalize }}"{% endif %}
+                         {% if 'pass' in field or 'password' in field %}autocomplete="new-password"{% endif %}>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            {% if app.config_fields %}
+              {% for field in app.config_fields %}
+                <div class="mb-3">
+                  <label for="{{ field }}" class="form-label">{{ field | capitalize }}</label>
+                  <div class="position-relative">
+                    <input type="{% if field == 'password' %}password{% else %}text{% endif %}"
+                           class="form-control"
+                           id="{{ field }}"
+                           name="{{ field }}"
+                           value="{{ app.config.get(field, '') }}"
+                           {% if field != 'password' %}placeholder="Enter your {{ field | capitalize }}"{% endif %}
+                           {% if field == 'password' %}autocomplete="new-password"{% endif %}>
+                    {% if field == 'password' %}
+                      <i class="bi bi-eye-slash position-absolute" style="top: 50%; transform: translateY(-50%); right: 10px; cursor: pointer;" onclick="togglePassword(this)"></i>
+                    {% endif %}
+                  </div>
+                </div>
+              {% endfor %}
+            {% endif %}
+          {% endif %}
+          {% if app.memory_profiles %}
+            <div class="mb-3">
+              <label for="memory_profile" class="form-label">Memory Profile</label>
+              <select class="form-control" id="memory_profile" name="memory_profile">
+                {% for profile_id, profile in app.memory_profiles.items() %}
+                  <option value="{{ profile_id }}" {% if profile_id == app.selected_profile %}selected{% endif %}>
+                    {{ profile.name }} ({{ profile.limit_mb }} MB)
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          {% endif %}
+          <div class="mb-3 form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="enabled" name="enabled" {% if app.is_enabled %}checked{% endif %}>
+            <label class="form-check-label" for="enabled">Enable App</label>
+          </div>
+          <button type="submit" class="btn btn-primary">Save Configuration</button>
+          {% if app.id == 'earnapp' or app.id == 'proxyrack' %}
+            <a href="{{ url_for('misc.generate_uuid', app_id=app.id) }}" class="btn btn-secondary">Generate Random UUID</a>
+          {% endif %}
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+{% if app.container_status != 'docker_unavailable' %}
+<div class="card mt-4">
+  <div class="card-header bg-dark text-white">🛠️ App Management</div>
+  <div class="card-body d-flex justify-content-center">
+    {% if app.container_status == 'running' %}
+      <a href="{{ url_for('handle.stop', container_id=app.container_id) }}" class="btn btn-danger me-2">Stop {{ app.name }}</a>
+      <a href="{{ url_for('handle.restart', container_id=app.container_id) }}" class="btn btn-warning me-2">Restart {{ app.name }}</a>
+      <button class="btn btn-info me-2" onclick="viewLogs('{{ app.container_id }}', '{{ app.name }}')">View Logs</button>
+      <button class="btn btn-secondary me-2 auto-restart" data-container-name="{{ app.container_name }}">Auto-Restart</button>
+    {% elif app.container_status == 'exited' or app.container_status == 'created' %}
+      <button type="button" class="btn btn-success me-2" onclick="event.preventDefault(); runApp('{{ app.id }}')">start {{ app.name }}</button>
+
+    {% elif app.container_status == 'not_created' %}
+      <button type="button" class="btn btn-primary me-2" onclick="event.preventDefault(); runApp('{{ app.id }}')">Run {{ app.name }}</button>
+    {% endif %}
+    {% if app.container_status == 'exited' or app.container_status == 'created' and app.container_id or app.container_status == 'restarting' %}
+      <a href="{{ url_for('handle.delete', container_id=app.container_id)}}" class="btn btn-danger me-2">Delete {{ app.name }}</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Modal for logs -->
+<div class="modal fade" id="logsModal" tabindex="-1" aria-labelledby="logsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="logsModalLabel">Logs for <span id="containerName"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <pre id="logsContent"></pre>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Warning Modal -->
+<div class="modal fade" id="warningModal" tabindex="-1" aria-labelledby="warningModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center">
+        <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size: 4rem;"></i>
+        <p id="warningMessage" class="mt-3"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Auto-Restart Modal -->
+<div class="modal fade" id="autoRestartModal" tabindex="-1" aria-labelledby="autoRestartModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="autoRestartModalLabel">Auto-Restart Configuration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>
+                    <i class="bi bi-info-circle me-2"></i>
+                    In some cases, the container is still running, but the app's dashboard shows the node as offline. This feature ensures your income flow remains sustainable by automatically restarting the container.
+                </p>
+                <form id="autoRestartForm">
+                    <div class="mb-3">
+                        <label for="restartHours" class="form-label">Restart every (hours)</label>
+                        <input type="number" class="form-control" id="restartHours" name="restartHours" min="1" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="saveAutoRestart">Save</button>
+                <button type="button" class="btn btn-danger" id="disableAutoRestart" style="display: none;">Disable</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="runAppModal" tabindex="-1" aria-labelledby="runAppModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="runAppModalLabel">Starting App</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body d-flex justify-content-center align-items-center flex-column" style="min-height: 200px;">
+        <div id="runAppSpinner" class="sk-circle">
+          <div class="sk-circle1 sk-child"></div>
+          <div class="sk-circle2 sk-child"></div>
+          <div class="sk-circle3 sk-child"></div>
+          <div class="sk-circle4 sk-child"></div>
+          <div class="sk-circle5 sk-child"></div>
+          <div class="sk-circle6 sk-child"></div>
+          <div class="sk-circle7 sk-child"></div>
+          <div class="sk-circle8 sk-child"></div>
+          <div class="sk-circle9 sk-child"></div>
+          <div class="sk-circle10 sk-child"></div>
+          <div class="sk-circle11 sk-child"></div>
+          <div class="sk-circle12 sk-child"></div>
+        </div>
+        <i id="runAppTick" class="bi bi-check-circle-fill" style="display: none; color: #28a745; font-size: 2.5rem;"></i>
+        <i id="runAppError" class="bi bi-x-circle-fill" style="display: none; color: #dc3545; font-size: 2.5rem;"></i>
+        <p id="runAppProcessingText" class="mt-3 text-center">Starting app...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentContainerName = null;
+
+  document.querySelectorAll('.auto-restart').forEach(button => {
+    button.addEventListener('click', function() {
+        currentContainerName = this.getAttribute('data-container-name');
+        fetch(`/get_auto_restart?container_name=${currentContainerName}`)
+            .then(response => response.json())
+            .then(data => {
+                const restartHoursInput = document.getElementById('restartHours');
+                const disableButton = document.getElementById('disableAutoRestart');
+                if (data.hours) {
+                    restartHoursInput.value = data.hours;
+                    disableButton.style.display = 'inline-block';
+                } else {
+                    restartHoursInput.value = '';
+                    disableButton.style.display = 'none';
+                }
+                const modal = new bootstrap.Modal(document.getElementById('autoRestartModal'));
+                modal.show();
+            });
+    });
+});
+
+  document.getElementById('disableAutoRestart').addEventListener('click', function() {
+    fetch('/disable_auto_restart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ container_name: currentContainerName })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = `/flash_message?category=success&message=Auto-restart disabled successfully.`;
+            const modal = bootstrap.Modal.getInstance(document.getElementById('autoRestartModal'));
+            modal.hide();
+        } else {
+            window.location.href = `/flash_message?category=danger&message=Failed to disable auto-restart: ${data.error}`;
+        }
+    });
+});
+
+  document.getElementById('saveAutoRestart').addEventListener('click', function() {
+      const hours = document.getElementById('restartHours').value;
+      if (!hours || hours < 1) {
+          window.location.href = `/flash_message?category=danger&message=Please enter a valid number of hours.`;
+          return;
+      }
+      fetch('/save_auto_restart', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ container_name: currentContainerName, hours: hours })
+      })
+      .then(response => response.json())
+      .then(data => {
+          window.location.href = data.success
+              ? `/flash_message?category=success&message=Auto-restart configuration saved successfully.`
+              : `/flash_message?category=danger&message=Failed to save configuration: ${data.error}`;
+      });
+  });
+
+  function togglePassword(icon) {
+    const input = icon.previousElementSibling;
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.classList.remove('bi-eye-slash');
+      icon.classList.add('bi-eye');
+    } else {
+      input.type = 'password';
+      icon.classList.remove('bi-eye');
+      icon.classList.add('bi-eye-slash');
+    }
+  }
+
+function viewLogs(containerId, containerName) {
+    fetch(`/container_logs/${containerId}`)
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    if (response.status === 403 && data.error && data.error.includes("Logging is disabled")) {
+                        return { success: false, error: data.error };
+                    }
+                    throw new Error(data.error || 'Failed to fetch logs');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Response data:', data);
+            if (data.success) {
+                document.getElementById('logsContent').textContent = data.logs;
+                document.getElementById('containerName').textContent = containerName;
+                const logsModal = new bootstrap.Modal(document.getElementById('logsModal'));
+                logsModal.show();
+            } else if (data.error && data.error.includes("Logging is disabled")) {
+                showWarningPopup(data.error);
+            } else {
+                alert(data.error || 'Unknown error');
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            alert(error.message);
+        });
+}
+
+  function showWarningPopup(message) {
+      const warningModalBody = document.getElementById('warningMessage');
+      if (warningModalBody) {
+          warningModalBody.textContent = message;
+          const warningModal = new bootstrap.Modal(document.getElementById('warningModal'));
+          if (warningModal) {
+              warningModal.show();
+          } else {
+              console.error('Bootstrap Modal initialization failed');
+          }
+      } else {
+          console.error('warningMessage element not found');
+      }
+  }
+
+  // Ensure the button triggers the function (assuming it's set up like this)
+  document.querySelectorAll('.view-logs').forEach(button => {
+      button.addEventListener('click', function() {
+          viewLogs(this.getAttribute('data-container-id'), this.getAttribute('data-container-name'));
+      });
+  });
+
+  {% if app.sub_apps %}
+    const subAppData = {{ app.sub_apps | tojson | safe }};
+    const configData = {{ app.config | tojson | safe }};
+
+    function updateInstructionsAndConfig() {
+      const subAppSelect = document.getElementById('sub_app_select');
+      const subAppId = subAppSelect.value;
+      const selectedSubApp = subAppData.find(subApp => subApp.id === subAppId);
+
+      // Update instructions
+      const instructionsDiv = document.getElementById('sub_app_instructions');
+      instructionsDiv.innerHTML = selectedSubApp.instructions;
+
+      // Update config fields
+      const configFieldsDiv = document.getElementById('sub_app_config_fields');
+      let configFieldsHtml = '';
+      selectedSubApp.config_fields.forEach(field => {
+        const isPassword = field.includes('pass') || field.includes('password');
+        const fieldValue = (configData[selectedSubApp.id] && configData[selectedSubApp.id][field]) || '';
+        configFieldsHtml += `
+          <div class="mb-3">
+            <label for="${field}" class="form-label">${field.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}</label>
+            <div class="position-relative">
+              <input type="${isPassword ? 'password' : 'text'}"
+                     class="form-control"
+                     id="${field}"
+                     name="${field}"
+                     value="${fieldValue.replace(/"/g, '&quot;')}"
+                     ${isPassword ? 'autocomplete="new-password"' : `placeholder="Enter your ${field.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}"`}>
+              ${isPassword ? '<i class="bi bi-eye-slash position-absolute" style="top: 50%; transform: translateY(-50%); right: 10px; cursor: pointer;" onclick="togglePassword(this)"></i>' : ''}
+            </div>
+          </div>
+        `;
+      });
+      configFieldsDiv.innerHTML = configFieldsHtml;
+
+      // Update hidden sub_app_id field
+      document.getElementById('sub_app_id').value = subAppId;
+    }
+    window.addEventListener('load', function() {
+      updateInstructionsAndConfig();
+    });
+  {% endif %}
+  function runApp(appId) {
+  let operationComplete = false;
+  const modal = new bootstrap.Modal(document.getElementById('runAppModal'));
+  modal.show();
+  const spinner = document.getElementById('runAppSpinner');
+  const tick = document.getElementById('runAppTick');
+  const errorIcon = document.getElementById('runAppError');
+  const processingText = document.getElementById('runAppProcessingText');
+  if (spinner) spinner.style.display = 'block';
+  if (tick) tick.style.display = 'none';
+  if (processingText) processingText.textContent = 'Starting app...';
+  fetch(`/handle/start_app/${appId}`, {
+      method: 'GET',
+      headers: { 'Accept': 'text/plain' }
+  })
+      .then(response => {
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          let lastLine = '';
+          let lastUpdateTime = 0;
+          function read() {
+              reader.read().then(({ done, value }) => {
+                  if (done) {
+                      if (spinner) spinner.style.display = 'none';
+                      if (/started successfully/i.test(lastLine)) {
+                          if (tick) tick.style.display = 'block';
+                          if (processingText) processingText.textContent = 'App started successfully.';
+                        } else {
+                          if (errorIcon) errorIcon.style.display = 'block';
+                          if (processingText) processingText.textContent = `Failed to start app: ${lastLine || 'Unknown error'}`;
+                        }
+                      operationComplete = true;
+                      return;
+                  }
+
+                  const now = Date.now();
+                  const delay = 1500;
+
+                  const chunk = decoder.decode(value, { stream: true });
+                  buffer += chunk;
+                  const lines = buffer.split('\n');
+                  buffer = lines.pop() || '';
+                  lastLine = lines.filter(line => line.trim() !== '').pop();
+                  if (lastLine) {
+                    const timeSinceLastUpdate = now - lastUpdateTime;
+                    const update = () => {
+                      if (processingText) processingText.textContent = lastLine.trim();
+                      lastUpdateTime = Date.now();
+                      read();
+                  };
+                  if (timeSinceLastUpdate >= delay) {
+                    update();
+                  } else {
+                    setTimeout(update, delay - timeSinceLastUpdate);
+                  }
+              } else {
+                read(); // Continue reading if no valid line
+              }
+              }).catch(error => {
+                  console.error('Read error:', error);
+              });
+          }
+          read();
+      })
+      .catch(error => {
+          console.error('Fetch error:', error);
+          if (processingText) processingText.textContent = 'Error occurred while starting app.';
+          operationComplete = true;
+      });
+
+  document.getElementById('runAppModal').addEventListener('hidden.bs.modal', function () {
+      if (operationComplete) {
+          window.location.href = `/app/${appId}`;
+      }
+  }, { once: true });
+}
+</script>
+{% endblock %}

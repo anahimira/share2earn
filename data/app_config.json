@@ -1,0 +1,73 @@
+{
+    "memory_profiles": {
+        "little_memory": {
+            "name": "Little Memory",
+            "limit_mb": 100
+        },
+        "medium_memory": {
+            "name": "Medium Memory",
+            "limit_mb": 300
+        },
+        "high_memory": {
+            "name": "High Memory",
+            "limit_mb": 500
+        }
+    },
+    "app_memory_profiles": {
+        "earnapp": "medium_memory",
+        "honeygain": "medium_memory",
+        "mysterium": "medium_memory",
+        "depin_node": "high_memory",
+        "ebesucher": "high_memory",
+        "adnade": "high_memory",
+        "earnfm": "little_memory",
+        "pawns": "little_memory",
+        "packetstream": "little_memory",
+        "traffmonetizer": "little_memory",
+        "repocket": "little_memory",
+        "proxylite": "little_memory",
+        "proxyrack": "medium_memory",
+        "packetshare": "little_memory",
+        "castarsdk": "medium_memory",
+        "wipter": "high_memory",
+        "uprock": "high_memory"
+    },
+    "app_enabled": {
+        "mysterium": false,
+        "honeygain": false,
+        "pawns": false,
+        "earnapp": false,
+        "packetstream": false,
+        "traffmonetizer": false,
+        "earnfm": false,
+        "repocket": false,
+        "bitping": false,
+        "proxylite": false,
+        "proxyrack": false,
+        "packetshare": false,
+        "gaganode": false,
+        "peer2profit": false,
+        "depin_node": false,
+        "packetsdk": false,
+        "castarsdk": false,
+        "wipter": false,
+        "uprock": false,
+        "ebesucher": false,
+        "adnade": false
+    },
+    "auto_restart": {},
+    "proxy_app_enabled": {
+        "honeygain": false,
+        "earnfm": false,
+        "pawns": false,
+        "earnapp": false,
+        "packetstream": false,
+        "traffmonetizer": false,
+        "repocket": false,
+        "proxylite": true,
+        "packetshare": false,
+        "castarsdk": false,
+        "wipter": false,
+        "uprock": false
+    }
+}

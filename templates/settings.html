@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<style>
+    .card {
+        transition: transform 0.2s ease-in-out;
+    }
+  .card:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+</style>
+<h1 class="mb-0 text-center">Settings</h1>
+<p class="text-center text-muted mb-4">Manage memory profiles and global container settings</p>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div id="flash-container">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show text-center" role="alert">
+          {{ message | safe }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<div class="card mb-4">
+  <div class="card-header bg-dark text-white">🛠️ Add New Memory Profile</div>
+  <div class="card-body">
+    <form action="{{ url_for('settings.settings') }}" method="POST">
+      <input type="hidden" name="action" value="add">
+      <div class="mb-3">
+        <label for="profile_name" class="form-label">Profile Name</label>
+        <input type="text" class="form-control" id="profile_name" name="profile_name" required>
+      </div>
+      <div class="mb-3">
+        <label for="limit_mb" class="form-label">Memory Limit (MB)</label>
+        <input type="number" class="form-control" id="limit_mb" name="limit_mb" min="50" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Add Profile</button>
+    </form>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header bg-dark text-white">📋 Memory Profiles</div>
+  <div class="card-body">
+    {% if profiles %}
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Limit (MB)</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for profile_id, profile in profiles.items() %}
+            <tr>
+              <td>{{ profile.name }}</td>
+              <td>{{ profile.limit_mb }}</td>
+              <td>
+                {% if profile_id not in ['little_memory', 'medium_memory', 'high_memory'] %}
+                  <form action="{{ url_for('settings') }}" method="POST" style="display:inline;">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="profile_id" value="{{ profile_id }}">
+                    <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                  </form>
+                {% else %}
+                  <span class="text-muted">Default</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No memory profiles found.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header bg-dark text-white">⚙️ Global Container Settings</div>
+  <div class="card-body">
+    <form action="{{ url_for('settings.save_global_settings') }}" method="POST">
+      <div class="mb-3">
+        <label for="cpu_limit" class="form-label">CPU Limit (number of CPUs, e.g., 1, 2)</label>
+        <input type="number" step="0.1" min="0.1" class="form-control" id="cpu_limit" name="cpu_limit" value="{{ global_settings.cpu_limit | default('') }}" placeholder="Default: 1 (optional)">
+      </div>
+      <div class="mb-3">
+        <label for="memory_reservation" class="form-label">Memory Reservation (MB)</label>
+        <input type="number" min="0" class="form-control" id="memory_reservation" name="memory_reservation" value="{{ global_settings.memory_reservation | default('') }}" placeholder="Optional">
+      </div>
+      <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" id="enable_logs" name="enable_logs" {% if global_settings.enable_logs %}checked{% endif %}>
+        <label class="form-check-label" for="enable_logs">Enable Logs</label>
+      </div>
+      <button type="submit" class="btn btn-primary">Save Settings</button>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% block title %}Manage Containers{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h1 class="text-center">Manage Containers</h1>
+    <p class="text-center text-muted">Control your Docker containers</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="card">
+        <div class="card-header bg-dark text-white">
+            📦 Containers
+        </div>
+        <div class="card-body">
+            {% if containers %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for container in containers %}
+                                <tr>
+                                    <td>{{ container.name }}</td>
+                                    <td>{{ container.status | capitalize }}</td>
+                                    <td>
+                                        {% if container.is_running %}
+                                            <a href="{{ url_for('handle.stop', container_id=container.id, _from='manage') }}" class="btn btn-danger btn-sm me-1">Stop</a>
+                                            <a href="{{ url_for('handle.restart', container_id=container.id, _from='manage') }}" class="btn btn-warning btn-sm me-1">Restart</a>
+                                            <button class="btn btn-info btn-sm me-1 view-logs" data-container-id="{{ container.id }}" data-container-name="{{ container.name }}">View Logs</button>
+                                            <button class="btn btn-secondary btn-sm me-1 auto-restart" data-container-name="{{ container.name }}">Auto-Restart</button>
+                                        {% else %}
+                                            <a href="{{ url_for('handle.restart', container_id=container.id, _from='manage') }}" class="btn btn-success btn-sm me-1">Start</a>
+                                            <a href="{{ url_for('handle.delete', container_id=container.id, _from='manage') }}" class="btn btn-danger btn-sm me-1">Delete</a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p>No containers found.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Modal for logs -->
+    <div class="modal fade" id="logsModal" tabindex="-1" aria-labelledby="logsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="logsModalLabel">Logs for <span id="containerName"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <pre id="logsContent"></pre>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Warning Modal -->
+<div class="modal fade" id="warningModal" tabindex="-1" aria-labelledby="warningModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center">
+        <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size: 4rem;"></i>
+        <p id="warningMessage" class="mt-3"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Auto-Restart Modal -->
+<div class="modal fade" id="autoRestartModal" tabindex="-1" aria-labelledby="autoRestartModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="autoRestartModalLabel">Auto-Restart Configuration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>
+                    <i class="bi bi-info-circle me-2"></i>
+                    In some cases, the container is still running, but the app's dashboard shows the node as offline. This feature ensures your income flow remains sustainable by automatically restarting the container.
+                </p>
+                <form id="autoRestartForm">
+                    <div class="mb-3">
+                        <label for="restartHours" class="form-label">Restart every (hours)</label>
+                        <input type="number" class="form-control" id="restartHours" name="restartHours" min="1" required>
+                    </div>
+                </form>
+            </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="saveAutoRestart">Save</button>
+                    <button type="button" class="btn btn-danger" id="disableAutoRestart" style="display: none;">Disable</button>
+                </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    // Handle "View Logs" button clicks
+    const viewLogsButtons = document.querySelectorAll('.view-logs');
+    viewLogsButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const containerId = this.getAttribute('data-container-id');
+            const containerName = this.getAttribute('data-container-name');
+            fetch(`/container_logs/${containerId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            if (response.status === 403 && data.error && data.error.includes("Logging is disabled")) {
+                                return { success: false, error: data.error };
+                            }
+                            throw new Error(data.error || 'Failed to fetch logs');
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Response data:', data);
+                    if (data.success) {
+                        document.getElementById('logsContent').textContent = data.logs;
+                        document.getElementById('containerName').textContent = containerName;
+                        const logsModal = new bootstrap.Modal(document.getElementById('logsModal'));
+                        logsModal.show();
+                    } else if (data.error && data.error.includes("Logging is disabled")) {
+                        showWarningPopup(data.error);
+                    } else {
+                        alert(data.error || 'Unknown error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Fetch error:', error);
+                    alert(error.message);
+                });
+        });
+    });
+
+    // Function to show warning popup
+    function showWarningPopup(message) {
+        const warningModalBody = document.getElementById('warningMessage');
+        if (warningModalBody) {
+            warningModalBody.textContent = message;
+            const warningModal = new bootstrap.Modal(document.getElementById('warningModal'));
+            if (warningModal) {
+                warningModal.show();
+            } else {
+                console.error('Bootstrap Modal initialization failed');
+            }
+        } else {
+            console.error('warningMessage element not found');
+        }
+    }
+});
+    let currentContainerName = null;
+
+    document.querySelectorAll('.auto-restart').forEach(button => {
+    button.addEventListener('click', function() {
+        currentContainerName = this.getAttribute('data-container-name');
+        fetch(`/get_auto_restart?container_name=${currentContainerName}`)
+            .then(response => response.json())
+            .then(data => {
+                const restartHoursInput = document.getElementById('restartHours');
+                const disableButton = document.getElementById('disableAutoRestart');
+                if (data.hours) {
+                    restartHoursInput.value = data.hours;
+                    disableButton.style.display = 'inline-block';
+                } else {
+                    restartHoursInput.value = '';
+                    disableButton.style.display = 'none';
+                }
+                const modal = new bootstrap.Modal(document.getElementById('autoRestartModal'));
+                modal.show();
+            });
+    });
+});
+
+    document.getElementById('saveAutoRestart').addEventListener('click', function() {
+        const hours = document.getElementById('restartHours').value;
+        if (!hours || hours < 1) {
+            window.location.href = `/flash_message?category=danger&message=Please enter a valid number of hours.`;
+            return;
+        }
+        fetch('/save_auto_restart', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ container_name: currentContainerName, hours: hours })
+        })
+        .then(response => response.json())
+        .then(data => {
+            window.location.href = data.success
+                ? `/flash_message?category=success&message=Auto-restart configuration saved successfully.`
+                : `/flash_message?category=danger&message=Failed to save configuration: ${data.error}`;
+        });
+    });
+    document.getElementById('disableAutoRestart').addEventListener('click', function() {
+    fetch('/disable_auto_restart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ container_name: currentContainerName })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = `/flash_message?category=success&message=Auto-restart disabled successfully.`;
+            const modal = bootstrap.Modal.getInstance(document.getElementById('autoRestartModal'));
+            modal.hide();
+        } else {
+            window.location.href = `/flash_message?category=danger&message=Failed to disable auto-restart: ${data.error}`;
+        }
+    });
+});
+</script>
+{% endblock %}

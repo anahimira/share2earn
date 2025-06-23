@@ -1,0 +1,247 @@
+{% extends 'base.html' %}
+
+{% block title %}Proxy Management{% endblock %}
+
+{% block content %}
+
+<h1 class="mb-0 text-center">Proxy Management</h1>
+<p class="text-center text-muted mb-4">Add and manage your proxies</p>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div id="flash-container">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show text-center" role="alert">
+          {{ message | safe }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<!-- Add Proxies Card -->
+<div class="card mb-4">
+  <div class="card-header bg-dark text-white">➕ Add Proxies</div>
+  <div class="card-body">
+    <form action="{{ url_for('proxy.proxy_page') }}" method="POST">
+      <div class="mb-3">
+        <label for="proxies" class="form-label">Proxies (one per line, e.g., protocol://ip:port or protocol://username:password@ip:port)</label>
+        <textarea class="form-control" id="proxies" name="proxies" rows="5" placeholder="http://192.168.1.1:8080&#10;socks5://10.0.0.1:1080&#10;socks5://user:pass@10.0.0.1:1080"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">Add Proxies</button>
+    </form>
+  </div>
+</div>
+
+<!-- Timeout Settings Card -->
+<div class="card mb-4">
+  <div class="card-header bg-dark text-white">⏱️ Proxy Check Settings</div>
+  <div class="card-body">
+    <form action="{{ url_for('proxy.set_proxy_timeout') }}" method="POST">
+      <div class="mb-3">
+        <label for="timeout" class="form-label">Timeout for proxy check (seconds)</label>
+        <input type="number" class="form-control" id="timeout" name="timeout" min="1" max="60" value="{{ timeout }}" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Set Timeout</button>
+    </form>
+  </div>
+</div>
+
+<!-- Proxies Table Card -->
+<div class="card">
+  <div class="card-header bg-dark text-white">📋 Proxies</div>
+  <div class="card-body">
+    {% if proxies %}
+      <div class="mb-3">
+        <label for="per_page" class="form-label">Proxies per page:</label>
+        <select id="per_page" class="form-select w-auto d-inline-block" onchange="changePerPage(this.value)">
+          {% for option in per_page_options %}
+            <option value="{{ option }}" {% if option == per_page %}selected{% endif %}>{{ option }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>Proxy</th>
+            <th>Status</th>
+            <th>Last Checked</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for proxy in proxies %}
+            <tr data-address="{{ proxy.address }}">
+              <td>{{ proxy.address }}</td>
+              <td class="status">{{ proxy.status }}</td>
+              <td class="last-checked">{{ proxy.last_checked }}</td>
+              <td>
+                <div class="action-buttons">
+                  <form action="{{ url_for('proxy.remove_proxy') }}" method="POST">
+                    <input type="hidden" name="proxy_address" value="{{ proxy.address }}">
+                    <button type="button" class="btn btn-danger btn-sm remove-proxy-btn" data-proxy="{{ proxy.address }}">Remove</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <!-- Pagination -->
+      <nav aria-label="Proxy pagination">
+        <ul class="pagination justify-content-center">
+          {% if page > 1 %}
+            <li class="page-item"><a class="page-link" href="{{ url_for('proxy.proxy_page', page=page-1, per_page=per_page) }}">Previous</a></li>
+          {% endif %}
+          {% for p in range(1, total_pages + 1) %}
+            <li class="page-item {% if p == page %}active{% endif %}"><a class="page-link" href="{{ url_for('proxy.proxy_page', page=p, per_page=per_page) }}">{{ p }}</a></li>
+          {% endfor %}
+          {% if page < total_pages %}
+            <li class="page-item"><a class="page-link" href="{{ url_for('proxy.proxy_page', page=page+1, per_page=per_page) }}">Next</a></li>
+          {% endif %}
+        </ul>
+      </nav>
+
+      <!-- Confirm Single Remove Modal -->
+      <div class="modal fade" id="confirmRemoveModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fixed">
+          <div class="modal-content no-shift">
+            <div class="modal-header">
+              <h5 class="modal-title">Confirm Removal</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p class="m-0">Are you sure you want to remove the proxy:</p>
+              <p class="text-danger mb-0 fw-bold proxy-display"><span id="proxyToRemove"></span></p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-danger" id="confirmRemoveBtn">Remove</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Confirm Remove All Modal -->
+      <div class="modal fade" id="confirmRemoveAllModal" tabindex="-1" aria-labelledby="confirmRemoveAllModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="confirmRemoveAllModalLabel">Confirm Removal</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              Are you sure you want to remove all offline proxies?
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-danger" id="confirmRemoveAllBtn">Remove All</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <p>No proxies added yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="d-flex justify-content-center mb-3">
+  <button type="button" class="btn btn-danger mx-2 my-3" id="removeAllOfflineBtn">Remove All Offline Proxies</button>
+</div>
+
+<script>
+  function changePerPage(value) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('per_page', value);
+    url.searchParams.set('page', 1);
+    window.location.href = url.toString();
+  }
+
+  // Auto-dismiss flash alerts
+  setTimeout(() => {
+    document.querySelectorAll('.alert').forEach(a => a.remove());
+  }, 4000);
+
+  document.addEventListener('DOMContentLoaded', () => {
+    let proxyToRemove = null;
+    const confirmModalEl = document.getElementById('confirmRemoveModal');
+    const confirmModal = new bootstrap.Modal(confirmModalEl, { backdrop: 'static', keyboard: false, focus: false });
+
+    document.querySelectorAll('.remove-proxy-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        proxyToRemove = btn.dataset.proxy;
+        document.getElementById('proxyToRemove').textContent = proxyToRemove;
+        confirmModal.show();
+      });
+    });
+
+    document.getElementById('confirmRemoveBtn').addEventListener('click', () => {
+      if (!proxyToRemove) return;
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/remove_proxy';
+      form.innerHTML = `<input type="hidden" name="proxy_address" value="${proxyToRemove}">`;
+      document.body.appendChild(form);
+      form.submit();
+    });
+
+    document.getElementById('removeAllOfflineBtn').addEventListener('click', () => {
+      new bootstrap.Modal(document.getElementById('confirmRemoveAllModal'), { backdrop: 'static', keyboard: false, focus: false }).show();
+    });
+
+    document.getElementById('confirmRemoveAllBtn').addEventListener('click', () => {
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/remove_offline_proxies';
+      document.body.appendChild(form);
+      form.submit();
+    });
+
+    // Initial status fetch and live check button
+    fetch('/check_proxies')
+      .then(r => r.json())
+      .then(data => {
+        data.forEach(proxy => {
+          const row = document.querySelector(`tr[data-address="${proxy.address}"]`);
+          if (!row) return;
+          row.querySelector('.status').textContent = proxy.status;
+          row.querySelector('.status').className = `status ${proxy.status === 'online' ? 'text-success' : (proxy.status === 'checking' ? 'text-warning' : 'text-danger')}`;
+          row.querySelector('.last-checked').textContent = proxy.last_checked;
+
+          if (proxy.status !== 'checking') {
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-sm ms-2 btn-check-live';
+            btn.innerHTML = '<i class="bi bi-wifi me-1"></i> Check Live';
+            btn.addEventListener('click', () => checkLive(proxy.address, row));
+            row.querySelector('.action-buttons').append(btn);
+          }
+        });
+      });
+
+    function checkLive(address, row) {
+      const statusEl = row.querySelector('.status');
+      const lastEl = row.querySelector('.last-checked');
+      statusEl.textContent = 'checking';
+      statusEl.className = 'status text-warning';
+      lastEl.textContent = 'N/A';
+
+      fetch(`/check_proxy/${encodeURIComponent(address)}`)
+        .then(r => r.json())
+        .then(data => {
+          statusEl.textContent = data.status || 'error';
+          statusEl.className = `status ${data.status === 'online' ? 'text-success' : 'text-danger'}`;
+          lastEl.textContent = data.last_checked || 'N/A';
+        })
+        .catch(() => {
+          statusEl.textContent = 'error';
+          statusEl.className = 'status text-danger';
+          lastEl.textContent = 'N/A';
+        });
+    }
+  });
+</script>
+{% endblock %}

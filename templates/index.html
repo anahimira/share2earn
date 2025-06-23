@@ -1,0 +1,229 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<style>
+    .card {
+        transition: transform 0.2s ease-in-out;
+    }
+  .card:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+</style>
+<h1 class="mb-0 text-center">Dashboard</h1>
+<p class="text-center text-muted mb-4">Manage your Docker apps</p>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div id="flash-container">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show text-center" role="alert">
+          {{ message | safe }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<!-- Run All Modal -->
+<div class="modal fade" id="runAllModal" tabindex="-1" aria-labelledby="runAllModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="runAllModalLabel">Running All Apps</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body d-flex justify-content-center align-items-center flex-column" style="min-height: 200px;">
+        <div id="runAllSpinner" class="sk-circle">
+          <div class="sk-circle1 sk-child"></div>
+          <div class="sk-circle2 sk-child"></div>
+          <div class="sk-circle3 sk-child"></div>
+          <div class="sk-circle4 sk-child"></div>
+          <div class="sk-circle5 sk-child"></div>
+          <div class="sk-circle6 sk-child"></div>
+          <div class="sk-circle7 sk-child"></div>
+          <div class="sk-circle8 sk-child"></div>
+          <div class="sk-circle9 sk-child"></div>
+          <div class="sk-circle10 sk-child"></div>
+          <div class="sk-circle11 sk-child"></div>
+          <div class="sk-circle12 sk-child"></div>
+        </div>
+        <i id="runAllTick" class="bi bi-check-circle-fill" style="display: none; color: #28a745; font-size: 2.5rem;"></i>
+        <p id="runAllProcessingText" class="mt-3 text-center">Processing apps...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header bg-dark text-white">🖥️ System Information</div>
+  <div class="card-body">
+    <p><strong>Detected OS type:</strong> {{ system_info.os_type }}</p>
+    <p><strong>Detected architecture:</strong> {{ system_info.architecture }}</p>
+    <p><strong>Device Name:</strong> {{ system_info.device_name }}
+      <button type="button" class="btn btn-sm p-0" data-bs-toggle="modal" data-bs-target="#editDeviceNameModal">
+        <img src="https://cdn-icons-png.flaticon.com/512/84/84380.png" alt="Edit" style="width: 16px; height: 16px;">
+      </button>
+    </p>
+    <p>Docker {{ system_info.architecture }} image architecture will be used if the app's image permits it.</p>
+  </div>
+</div>
+
+<!-- Modal for Editing Device Name -->
+<div class="modal fade" id="editDeviceNameModal" tabindex="-1" aria-labelledby="editDeviceNameModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editDeviceNameModalLabel">Edit Device Name</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="{{ url_for('misc.update_device_name') }}" method="POST">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="device_name" class="form-label">Device Name</label>
+            <input type="text" class="form-control" id="device_name" name="device_name" value="{{ system_info.device_name }}" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-4">
+  <div class="col-12 text-center">
+    <a href="#" class="btn btn-success me-2" id="runAllBtn">Run All Enabled Apps</a>
+    <a href="{{ url_for('handle.stop_all') }}" class="btn btn-danger me-2">Stop All</a>
+    <a href="{{ url_for('stats.stats') }}" class="btn btn-info me-2">View Stats</a>
+    <a href="{{ url_for('manage.manage') }}" class="btn btn-secondary me-2">Manage Containers</a>
+    <a href="{{ url_for('settings.settings') }}" class="btn btn-primary">Settings</a>
+  </div>
+</div>
+
+<h2 class="mb-4">Apps</h2>
+<div class="row">
+  {% for app in apps %}
+    <div class="col-md-6 mb-4">
+      <div class="card h-100">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+          <span>{{ app.name }}</span>
+          <span>
+            {% if app.is_running %}
+              <span class="badge bg-success">Running</span>
+            {% else %}
+              <span class="badge bg-secondary">Stopped</span>
+            {% endif %}
+            {% if app.is_enabled %}
+              <span class="badge bg-primary">Enabled</span>
+            {% else %}
+              <span class="badge bg-warning">Disabled</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="card-body">
+          <p>{{ app.description }}</p>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item"><i class="fas fa-users"></i> <strong>Max devices per Account:</strong> {{ app.max_devices_per_account }}</li>
+            <li class="list-group-item"><i class="fas fa-network-wired"></i> <strong>Devices per IP:</strong> {{ app.devices_per_ip }}</li>
+            <li class="list-group-item"><i class="fas fa-dollar-sign"></i> <strong>Payment:</strong> {{ app.payment }}</li>
+          </ul>
+        </div>
+        <div class="card-footer text-center">
+          <a href="{{ url_for('app_details.app_detail', app_id=app.id) }}" class="btn btn-primary">Configure</a>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<script>
+
+  // Run All Apps button
+  document.getElementById('runAllBtn').addEventListener('click', function(e) {
+    e.preventDefault();
+    let operationComplete = false;
+
+    const modalEl = document.getElementById('runAllModal');
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+
+    const spinner = document.getElementById('runAllSpinner');
+    const tick = document.getElementById('runAllTick');
+    const processingText = document.getElementById('runAllProcessingText');
+
+    if (spinner) spinner.style.display = 'block';
+    if (tick) tick.style.display = 'none';
+    if (processingText) processingText.textContent = 'Processing apps...';
+
+    fetch('/handle/run_all', {
+      method: 'GET',
+      headers: { 'Accept': 'text/event-stream' }
+    })
+    .then(response => {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let lastUpdateTime = 0;
+
+      function read() {
+        reader.read().then(({ done, value }) => {
+          if (done) {
+            if (spinner) spinner.style.display = 'none';
+            if (tick) tick.style.display = 'block';
+            if (processingText) processingText.textContent = 'All apps processed.';
+            operationComplete = true;
+            return;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          const lastLine = lines.filter(line => line.trim()).pop();
+
+          const now = Date.now();
+          const delay = 1500;
+
+          if (lastLine) {
+            const timeSinceLastUpdate = now - lastUpdateTime;
+            const update = () => {
+              if (processingText) processingText.textContent = lastLine.trim();
+              lastUpdateTime = Date.now();
+              read();
+            };
+
+            if (timeSinceLastUpdate >= delay) {
+              update();
+            } else {
+              setTimeout(update, delay - timeSinceLastUpdate);
+            }
+          } else {
+            read(); // Continue reading if no valid line
+          }
+        });
+      }
+
+      read();
+    })
+    .catch(error => {
+      console.error('Fetch error:', error);
+      if (processingText) processingText.textContent = 'Error occurred while running apps.';
+      if (spinner) spinner.style.display = 'none';
+      operationComplete = true;
+    });
+
+    modalEl.addEventListener('hidden.bs.modal', function () {
+      if (operationComplete) {
+        location.reload();
+      }
+    }, { once: true });
+  });
+</script>
+
+{% endblock %}
