@@ -55,23 +55,28 @@ Get up and running in a few simple steps:
 
 If you're hosting this on a remote server (e.g. VPS or Raspberry Pi), and want to keep the app running after your SSH session ends:
 
-1. **Start a `screen` session:**
+1. **Install `screen`** (if not already installed):
+
+   ```bash
+   sudo apt install screen
+
+2. **Start a `screen` session:**
 
    ```bash
    screen -S share2earn
    ```
 
-2. **Run the app inside that session:**
+3. **Run the app inside that session:**
 
    ```bash
    python main.py
    ```
 
-3. **Detach from the screen session:**
+4. **Detach from the screen session:**
 
    Press `Ctrl+A`, then `D`
 
-4. **Reattach later with:**
+5. **Reattach later with:**
 
    ```bash
    screen -r share2earn
