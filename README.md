@@ -5,6 +5,7 @@
 ## 📚 Table of Contents
 
 - [🚀 Quick Start](#-quick-start)
+- [✨ Running on a Server?](#-running-on-a-server)
 - [⚙️ Configuration](#️-configuration)
 - [✨ Features](-features)
 - [🖥️ Usage](#️-usage)
@@ -47,6 +48,36 @@ Get up and running in a few simple steps:
 
    * Open your browser at [http://localhost:5000](http://localhost:5000) or your chosen port in `dashboard_config.json`.
    * First run auto-generates `data/` files and configurations.
+
+---
+
+### ✨ Running on a Server
+
+If you're hosting this on a remote server (e.g. VPS or Raspberry Pi), and want to keep the app running after your SSH session ends:
+
+1. **Start a `screen` session:**
+
+   ```bash
+   screen -S share2earn
+   ```
+
+2. **Run the app inside that session:**
+
+   ```bash
+   python main.py
+   ```
+
+3. **Detach from the screen session:**
+
+   Press `Ctrl+A`, then `D`
+
+4. **Reattach later with:**
+
+   ```bash
+   screen -r share2earn
+   ```
+
+> 🧠 This keeps your dashboard running 24/7 even after you disconnect from the server.
 
 ---
 
